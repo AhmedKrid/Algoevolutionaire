@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AG - Rang - TSP Quest</title>
+    <link rel="stylesheet" href="../css/main.css">
+    <style>
+        /* Starfield */
+        .starfield { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; overflow: hidden; }
+        .star { position: absolute; background: white; border-radius: 50%; animation: twinkle 3s infinite ease-in-out; }
+        @keyframes twinkle { 0%,100%{opacity:0.3} 50%{opacity:1} }
+        @keyframes moveStars { 0%{transform:translateY(0)} 100%{transform:translateY(-100vh)} }
+
+        /* Nebula */
+        .nebula-bg {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
+            background: radial-gradient(ellipse at 20% 50%, rgba(255,51,204,0.1) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 20%, rgba(0,255,204,0.1) 0%, transparent 50%),
+                        radial-gradient(ellipse at 40% 80%, rgba(255,204,0,0.1) 0%, transparent 50%);
+        }
+
+        /* PODIUM DE CLASSEMENT */
+        .podium-container {
+            width: 100px; height: 100px; margin: auto; position: relative; perspective: 300px;
+        }
+        .podium {
+            position: absolute; bottom: 0; width: 30px; transition: all 0.3s ease;
+            transform-style: preserve-3d; text-align: center; color: white; font-weight: bold;
+        }
+        .podium-1 { height: 70px; background: linear-gradient(#FFD700, #FFA500); left: 35px; box-shadow: 0 8px 16px rgba(255,215,0,0.5); }
+        .podium-2 { height: 55px; background: linear-gradient(#C0C0C0, #A9A9A9); left: 5px; box-shadow: 0 6px 12px rgba(192,192,192,0.5); }
+        .podium-3 { height: 40px; background: linear-gradient(#CD7F32, #B87333); left: 65px; box-shadow: 0 4px 8px rgba(205,127,50,0.5); }
+        .podium-label { position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 12px; text-shadow: 0 0 5px #000; }
+        .podium-rank { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; }
+
+        /* Canvas */
+        #tsp-canvas { border: 2px solid rgba(255,204,0,0.3); border-radius: 16px; background: rgba(26,26,26,0.3); backdrop-filter: blur(8px); }
+
+        /* Button */
+        .btn-pulse { animation: pulse-glow 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+        @keyframes pulse-glow { 0%,100% { box-shadow: 0 0 20px rgba(255,204,0,0.3); } 50% { box-shadow: 0 0 40px rgba(255,204,0,0.6); } }
+    </style>
+</head>
+<body class="bg-background text-text-primary overflow-x-hidden">
+
+    <div class="starfield" id="starfield"></div>
+    <div class="nebula-bg"></div>
+
+    <!-- Navigation - MÊME LOGO -->
+    <nav class="relative z-50 p-6">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                    <span class="text-background font-bold text-lg">T</span>
+                </div>
+                <span class="text-xl font-bold text-glow">TSP Quest</span>
+            </div>
+            <div class="hidden md:flex space-x-6">
+                <a href="home_landing.html" class="text-text-secondary hover:text-primary">Accueil</a>
+                <a href="genetic_rank.html" class="text-primary font-medium">AG - Rang</a>
+                <a href="genetic_roulette.html" class="text-text-secondary hover:text-primary">AG - Roulette</a>
+                <a href="simulated_annealing.html" class="text-text-secondary hover:text-primary">Recuit Simulé</a>
+                <a href="tabu_search_algorithm.html" class="text-text-secondary hover:text-primary">Recherche Tabou</a>
+            </div>
+            <button class="md:hidden text-primary" id="mobile-menu-btn">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="md:hidden hidden" id="mobile-menu">
+            <div class="glassmorphism mt-4 p-4 rounded-2xl">
+                <a href="home_landing.html" class="block py-2 text-text-secondary hover:text-primary">Accueil</a>
+                <a href="genetic_rank.html" class="block py-2 text-primary font-medium">AG - Rang</a>
+                <a href="genetic_roulette.html" class="block py-2 text-text-secondary hover:text-primary">AG - Roulette</a>
+                <a href="simulated_annealing.html" class="block py-2 text-text-secondary hover:text-primary">Recuit Simulé</a>
+                <a href="tabu_search_algorithm.html" class="block py-2 text-text-secondary hover:text-primary">Recherche Tabou</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="relative z-10 px-6 py-20">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-12">
+                <h1 class="text-4xl md:text-5xl font-bold mb-4 text-glow">
+                    AG <span class="text-yellow-400">Rang</span>
+                </h1>
+                <p class="text-text-secondary text-lg">10 villes – Classement – Résultat en moins de 3s</p>
+            </div>
+
+            <div class="grid lg:grid-cols-3 gap-8">
+                <!-- Canvas -->
+                <div class="lg:col-span-2">
+                    <div class="glassmorphism p-6 rounded-2xl">
+                        <canvas id="tsp-canvas" width="700" height="550" class="w-full"></canvas>
+                        <div class="flex gap-4 mt-6">
+                            <button id="start-btn" class="btn-primary btn-pulse px-6 py-3 rounded-xl">Démarrer</button>
+                            <button id="reset-btn" class="bg-red-600/20 border border-red-500 text-red-400 px-6 py-3 rounded-xl hover:bg-red-600 hover:text-black transition-all">Réinitialiser</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel -->
+                <div class="space-y-6">
+                    <!-- PODIUM DE CLASSEMENT -->
+                    <div class="glassmorphism p-6 rounded-2xl text-center">
+                        <h3 class="text-lg font-semibold mb-4 text-glow">Classement</h3>
+                        <div class="podium-container">
+                            <div class="podium podium-2" id="rank-2">
+                                <div class="podium-label">2</div>
+                                <div class="podium-rank" id="dist-2">—</div>
+                            </div>
+                            <div class="podium podium-1" id="rank-1">
+                                <div class="podium-label">1</div>
+                                <div class="podium-rank" id="dist-1">—</div>
+                            </div>
+                            <div class="podium podium-3" id="rank-3">
+                                <div class="podium-label">3</div>
+                                <div class="podium-rank" id="dist-3">—</div>
+                            </div>
+                        </div>
+                        <p class="mt-3 text-sm text-text-secondary">Top 3 (distance)</p>
+                    </div>
+
+                    <!-- Paramètres -->
+                    <div class="glassmorphism p-6 rounded-2xl">
+                        <h3 class="text-lg font-semibold mb-4 text-glow">Paramètres</h3>
+                        <div class="space-y-4 text-sm">
+                            <div>
+                                <label>Population</label>
+                                <input type="range" id="pop-size" min="20" max="100" value="50" class="w-full h-2 mt-1">
+                                <span id="pop-size-val" class="text-primary">50</span>
+                            </div>
+                            <div>
+                                <label>Générations</label>
+                                <input type="range" id="generations" min="100" max="1000" value="500" class="w-full h-2 mt-1">
+                                <span id="generations-val" class="text-primary">500</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Résultat -->
+                    <div class="glassmorphism p-6 rounded-2xl">
+                        <h3 class="text-lg font-semibold mb-4 text-glow">Résultat</h3>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span>Chemin:</span>
+                                <span id="best-path" class="font-mono text-yellow-400">—</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Distance:</span>
+                                <span id="best-distance" class="font-mono text-yellow-400">—</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // === MATRICE DISTANCES ===
+        const matrice_distances = [
+            [0, 2, 2, 7, 15, 2, 5, 7, 6, 5],
+            [2, 0, 10, 4, 7, 3, 7, 15, 8, 2],
+            [2, 10, 0, 1, 4, 3, 3, 4, 2, 3],
+            [7, 4, 1, 0, 2, 15, 7, 7, 5, 4],
+            [7, 10, 4, 2, 0, 7, 3, 2, 2, 7],
+            [2, 3, 3, 7, 7, 0, 1, 7, 2, 10],
+            [5, 7, 3, 7, 3, 1, 0, 2, 1, 3],
+            [7, 7, 4, 7, 2, 7, 2, 0, 1, 10],
+            [6, 8, 2, 5, 2, 2, 1, 1, 0, 15],
+            [5, 2, 3, 4, 7, 10, 3, 10, 15, 0]
+        ];
+
+        // === FONCTIONS AG RANG ===
+        function dist_totale(tour) {
+            let total = 0;
+            for (let i = 0; i < tour.length - 1; i++) {
+                total += matrice_distances[tour[i]][tour[i + 1]];
+            }
+            total += matrice_distances[tour[tour.length - 1]][tour[0]];
+            return total;
+        }
+
+        function muter(tour) {
+            const a = Math.floor(Math.random() * tour.length);
+            let b;
+            do { b = Math.floor(Math.random() * tour.length); } while (b === a);
+            const copie = [...tour];
+            [copie[a], copie[b]] = [copie[b], copie[a]];
+            return copie;
+        }
+
+        function croisement_simple(p1, p2) {
+            const n = p1.length;
+            const pt = Math.floor(Math.random() * (n - 2)) + 1;
+            const enfant = p1.slice(0, pt);
+            for (const x of p2) {
+                if (!enfant.includes(x)) enfant.push(x);
+            }
+            return enfant;
+        }
+
+        function croisement_double(p1, p2) {
+            const n = p1.length;
+            const [pt1, pt2] = [0, 1].map(() => Math.floor(Math.random() * n)).sort((a, b) => a - b);
+            const milieu = p2.slice(pt1, pt2);
+            const reste = p1.filter(x => !milieu.includes(x));
+            return [...reste.slice(0, pt1), ...milieu, ...reste.slice(pt1)];
+        }
+
+        function croisement_uniforme(p1, p2) {
+            const n = p1.length;
+            const masque = Array.from({ length: n }, () => Math.random() < 0.5 ? 0 : 1);
+            const pris = new Set();
+            const enfant = [];
+            for (let i = 0; i < n; i++) {
+                const src = masque[i] === 0 ? p1 : p2;
+                if (!pris.has(src[i])) {
+                    enfant.push(src[i]);
+                    pris.add(src[i]);
+                }
+            }
+            const manquants = Array.from({ length: n }, (_, i) => i).filter(x => !pris.has(x));
+            let j = 0;
+            const resultat = Array(n);
+            for (let i = 0; i < n; i++) {
+                if (i < enfant.length) {
+                    resultat[i] = enfant[i];
+                } else {
+                    resultat[i] = manquants[j++];
+                }
+            }
+            return resultat;
+        }
+
+        // === SÉLECTION PAR RANG ===
+        function selection_rang(population) {
+            const scores = population.map(ind => dist_totale(ind));
+            const ranked = population
+                .map((ind, i) => ({ ind, score: scores[i] }))
+                .sort((a, b) => a.score - b.score);
+            const total_rank = (population.length * (population.length + 1)) / 2;
+            const pick = Math.random() * total_rank;
+            let sum = 0;
+            for (let i = 0; i < ranked.length; i++) {
+                sum += (i + 1);
+                if (sum >= pick) return ranked[i].ind;
+            }
+            return ranked[ranked.length - 1].ind;
+        }
+
+        // === ALGO AVEC TRACE ===
+        function genetique_tsp_rang_trace(pop_size, generations) {
+            const n = matrice_distances.length;
+            const population = Array.from({ length: pop_size }, () => {
+                const ind = Array.from({ length: n }, (_, i) => i);
+                for (let i = ind.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [ind[i], ind[j]] = [ind[j], ind[i]];
+                }
+                return ind;
+            });
+
+            const trace = [];
+            let bestEver = null;
+            let bestDistEver = Infinity;
+
+            for (let gen = 0; gen < generations; gen++) {
+                const scores = population.map(ind => dist_totale(ind));
+                const meilleur_idx = scores.indexOf(Math.min(...scores));
+                const meilleur = population[meilleur_idx];
+                const dist_meilleur = scores[meilleur_idx];
+
+                if (dist_meilleur < bestDistEver) {
+                    bestEver = [...meilleur];
+                    bestDistEver = dist_meilleur;
+                }
+
+                const nouvelle_pop = [meilleur];
+
+                while (nouvelle_pop.length < pop_size) {
+                    const parent1 = selection_rang(population);
+                    const parent2 = selection_rang(population);
+                    const croisement = [croisement_simple, croisement_double, croisement_uniforme][Math.floor(Math.random() * 3)];
+                    let enfant = croisement(parent1, parent2);
+                    if (Math.random() < 0.2) enfant = muter(enfant);
+                    nouvelle_pop.push(enfant);
+                }
+
+                population.length = 0;
+                population.push(...nouvelle_pop);
+
+                const top3 = population
+                    .map(ind => dist_totale(ind))
+                    .sort((a, b) => a - b)
+                    .slice(0, 3);
+
+                trace.push({
+                    generation: gen + 1,
+                    current: [...meilleur],
+                    currentDist: dist_meilleur,
+                    best: [...bestEver],
+                    bestDist: bestDistEver,
+                    top3
+                });
+            }
+
+            return trace;
+        }
+
+        // === CANVAS ===
+        const canvas = document.getElementById('tsp-canvas');
+        const ctx = canvas.getContext('2d');
+        let cities = [], currentPath = [], bestPath = [], animationId = null;
+
+        function initCities() {
+            cities = [];
+            const margin = 100, grid = 150;
+            for (let i = 0; i < 10; i++) {
+                cities.push({ x: margin + (i % 4) * grid, y: margin + Math.floor(i / 4) * grid * 1.5, id: i });
+            }
+            currentPath = bestPath = Array.from({ length: 10 }, (_, i) => i);
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (bestPath.length > 1) {
+                ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2; ctx.setLineDash([]);
+                ctx.beginPath(); ctx.moveTo(cities[bestPath[0]].x, cities[bestPath[0]].y);
+                bestPath.forEach((id, i) => { if (i > 0) ctx.lineTo(cities[id].x, cities[id].y); });
+                ctx.closePath(); ctx.stroke();
+            }
+
+            if (currentPath.length > 1) {
+                ctx.strokeStyle = '#FFA500'; ctx.lineWidth = 3; ctx.setLineDash([8, 8]);
+                ctx.beginPath(); ctx.moveTo(cities[currentPath[0]].x, cities[currentPath[0]].y);
+                currentPath.forEach((id, i) => { if (i > 0) ctx.lineTo(cities[id].x, cities[id].y); });
+                ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+            }
+
+            cities.forEach(c => {
+                ctx.fillStyle = '#FFA500'; ctx.beginPath(); ctx.arc(c.x, c.y, 14, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = 'white'; ctx.font = 'bold 16px Inter'; ctx.textAlign = 'center';
+                ctx.fillText(c.id, c.x, c.y + 6);
+            });
+        }
+
+        // === PODIUM ANIMÉ ===
+        function updatePodium(top3) {
+            ['1','2','3'].forEach((rank, i) => {
+                const dist = top3[i] !== undefined ? top3[i] : '—';
+                document.getElementById(`dist-${rank}`).textContent = dist;
+            });
+        }
+
+        // === LANCEMENT ===
+        let isRunning = false;
+        function startAG() {
+            if (isRunning) return;
+            isRunning = true;
+            document.getElementById('start-btn').disabled = true;
+
+            const popSize = +document.getElementById('pop-size').value;
+            const generations = +document.getElementById('generations').value;
+
+            const trace = genetique_tsp_rang_trace(popSize, generations);
+
+            let idx = 0;
+            function step() {
+                if (idx >= trace.length) {
+                    const final = trace[trace.length - 1];
+                    bestPath = final.best;
+                    document.getElementById('best-path').textContent = final.best.join(' to ');
+                    document.getElementById('best-distance').textContent = final.bestDist;
+                    draw();
+                    isRunning = false;
+                    document.getElementById('start-btn').disabled = false;
+                    return;
+                }
+                const s = trace[idx++];
+                currentPath = s.current;
+                bestPath = s.best;
+                updatePodium(s.top3);
+                draw();
+                animationId = requestAnimationFrame(step);
+            }
+            step();
+        }
+
+        function reset() {
+            if (animationId) cancelAnimationFrame(animationId);
+            isRunning = false;
+            document.getElementById('start-btn').disabled = false;
+            initCities();
+            document.getElementById('best-path').textContent = '—';
+            document.getElementById('best-distance').textContent = '—';
+            updatePodium(['—','—','—']);
+        }
+
+        // === ÉVÉNEMENTS ===
+        document.getElementById('start-btn').addEventListener('click', startAG);
+        document.getElementById('reset-btn').addEventListener('click', reset);
+        ['pop-size', 'generations'].forEach(id => {
+            const input = document.getElementById(id);
+            const span = document.getElementById(id + '-val');
+            input.addEventListener('input', () => {
+                span.textContent = input.value;
+            });
+        });
+        document.getElementById('mobile-menu-btn').addEventListener('click', () => {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        });
+
+        // === INIT ===
+        initCities();
+        updatePodium(['—','—','—']);
+        createStarfield();
+
+        function createStarfield() {
+            const sf = document.getElementById('starfield');
+            for (let i = 0; i < 200; i++) {
+                const s = document.createElement('div'); s.className = 'star';
+                s.style.left = Math.random() * 100 + '%';
+                s.style.top = Math.random() * 100 + '%';
+                const sz = Math.random() * 3 + 1;
+                s.style.width = s.style.height = sz + 'px';
+                s.style.animationDelay = Math.random() * 3 + 's';
+                s.style.animation += `, moveStars ${Math.random() * 20 + 10}s linear infinite`;
+                sf.appendChild(s);
+            }
+        }
+    </script>
+    <script id="dhws-dataInjector" src="../public/dhws-data-injector.js"></script>
+</body>
+</html>
